@@ -12,6 +12,7 @@ from .codex import version as codex_version
 from .config import Config
 from .db import Store
 from .diagnostics import inspect_runtime
+from .preflight_errors import classify_error
 from .domain import Evaluation, ProjectInput, RuleError
 from .engine import tick
 from .models import Project
@@ -123,17 +124,25 @@ def main(argv=None) -> int:
                 cfg = Config.load()
                 cfg.policy()
                 info.update({"database_config": "present (credentials hidden)", "openai_key": bool(cfg.api_key), "openai_model": cfg.model or "NOT_SET"})
-            except RuleError as exc:
-                info["configuration"] = str(exc)
+            except Exception as exc:
+                info["error_code"] = classify_error(exc, configuration=True)
                 print(json.dumps(info, ensure_ascii=False, indent=2))
                 return 2
             if args.connect:
-                store = Store(cfg.database_url)
+                store = None
                 try:
+                    store = Store(cfg.database_url)
                     info["database"] = inspect_runtime(store)
                     info["database_connection_tested"] = True
+                except Exception as exc:
+                    # Keep a valid JSON result even when connection setup fails.
+                    # Neither exception text nor connection credentials leave here.
+                    info["error_code"] = classify_error(exc)
+                    print(json.dumps(info, ensure_ascii=False, indent=2))
+                    return 2
                 finally:
-                    store.engine.dispose()
+                    if store is not None:
+                        store.engine.dispose()
             print(json.dumps(info, ensure_ascii=False, indent=2))
             return 0 if not args.connect or info["database"]["database_ready"] else 2
         cfg, store = live()

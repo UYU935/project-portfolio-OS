@@ -4,9 +4,12 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import ssl
 import subprocess
 import sys
 import tempfile
+
+from portfolio_os.preflight_errors import ERROR_CODES
 
 CHECKS = (
     "dedicated_login", "non_privileged_role", "runtime_membership",
@@ -47,6 +50,13 @@ def main() -> int:
                 cert_path.write_text(ca + "\n", encoding="utf-8")
                 cert_path.chmod(0o600)
                 env["PGSSLROOTCERT"] = str(cert_path)
+            elif not env.get("PGSSLROOTCERT"):
+                # libpq verify-full does not automatically use the OS CA bundle.
+                # Keep full certificate/hostname verification. A supplied CA or
+                # sslrootcert in DATABASE_URL remains authoritative; never downgrade.
+                system_ca = ssl.get_default_verify_paths().cafile
+                if system_ca and Path(system_ca).is_file():
+                    env["PGSSLROOTCERT"] = system_ca
             completed = subprocess.run(
                 [sys.executable, "-m", "portfolio_os.cli", "doctor", "--connect"],
                 env=env, capture_output=True, text=True, timeout=90, check=False,
@@ -54,7 +64,16 @@ def main() -> int:
             # Captured stdout/stderr may contain secrets; never relay them.
             if completed.returncode not in (0, 2):
                 return emit("blocked", "diagnostic_process_failed")
-            report = json.loads(completed.stdout)
+            try:
+                report = json.loads(completed.stdout)
+            except (ValueError, TypeError):
+                return emit("blocked", "invalid_diagnostic_result")
+            if not isinstance(report, dict):
+                return emit("blocked", "invalid_diagnostic_result")
+            if "error_code" in report:
+                code = report["error_code"]
+                safe = code if isinstance(code, str) and code in ERROR_CODES else "diagnostic_internal_error"
+                return emit("blocked", safe)
             database = report.get("database", {})
             if not isinstance(database, dict):
                 return emit("blocked", "invalid_diagnostic_result")
