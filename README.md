@@ -1,22 +1,38 @@
-# Portfolio OS — Phase 1
+# Portfolio OS — Phase 1 / v0.1.2
 
-A single-owner portfolio manager designed around Python, OpenAI Responses API, Codex work briefs, and a private Supabase/PostgreSQL schema.
+Single-owner, approval-gated portfolio manager using Python, OpenAI Responses API, Codex work briefs, and a private Supabase/PostgreSQL schema.
 
-## Verified deployment status — 2026-09-30
+This review branch contains the executable engine, read-only runtime preflight, CLI, HTML snapshots and offline tests. Source publication is not a running service: production execution remains paused.
 
-- This branch currently contains documentation only. The executable application has **not** been published to a branch or a pull request.
-- The initial bulk source-code publication was stopped by the tool's safety check. It was not bypassed or treated as successful.
-- The dedicated database schema has been created with seven tables, row-level security, restricted service permissions, and a three-slot constraint for human-active projects.
-- Two database migrations are recorded. Restricted-role tests verified that a fourth human slot is rejected and that the service role cannot delete records or rewrite the audit table. Test records were rolled back.
-- The database remains paused. No paid model calls, scheduled worker, external publication, or Codex execution has been enabled.
-- The revised local package passed 68 offline tests. This is **not** a successful GitHub Actions run and does not establish live OpenAI or Python-to-PostgreSQL connectivity.
+## Offline quick start
+
+```sh
+python -m venv .venv
+# Activate .venv with the command appropriate to your operating system.
+python -m pip install -e '.[dev]'
+python -m pytest -q
+python -m portfolio_os.cli demo
+```
+
+The demo uses synthetic records, SQLite and deterministic responses. It never connects to Supabase/OpenAI or launches Codex.
+
+## Runtime preparation
+
+Read `docs/SETUP_ja.md` before configuring anything. Install the `live` extra only in the owner-controlled execution environment. Use a dedicated login, TLS certificate verification, and private environment variables. Run `portfolio-os doctor --connect` first; it performs read-only database and permission checks, not a paid API test.
+
+Imported projects are disabled. Only explicit owner commands can enroll/resume. A tick is bounded to three reviews and one task, with six reserved model requests per UTC day by default. Request limits are not currency spending guarantees. Human-active work has exactly three available database slots.
 
 ## Data boundary
 
-This is a public code repository. Real business briefs, customer observations, research results, generated artifacts, credentials, and personal data must not be committed here. Private records remain in the private database or an owner-controlled workspace.
+This is a public code repository. Do not commit real business briefs, customer observations, patient/children's records, generated reports, API keys, database credentials or Codex authentication files. Private data stays in the dedicated database and an owner-controlled workspace.
 
-## Remaining work
+The initial database migrations are already applied in the existing deployment. Do not reapply them as new migrations. This version makes no production schema/data changes.
 
-Review and complete source publication; configure a dedicated database login and OpenAI API credentials in a trusted execution environment; run one bounded integration test; only then consider scheduled execution. Account connection in ChatGPT is separate from runtime credential configuration.
+## Not implemented / not verified
 
-Codex support in phase 1 means generating a work brief, not automatically running generated code or building a completed application. No review branch, application CI result, or completed deployment should be inferred from this README.
+- Codex integration generates a work brief, not automatic code execution or deployment.
+- No hosted approval UI or scheduled production worker is installed.
+- Runtime login, Python-to-Supabase connectivity and live OpenAI access still require verification.
+- An offline test pass or a green CI run does not demonstrate customer demand, production readiness, or success of a business.
+
+See `BUILD_STATUS.md` for the verification boundary and `AGENTS.md` for coding-agent constraints.
