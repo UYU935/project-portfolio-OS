@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools==82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portfolio-os"
+version = "0.1.2"
+description = "Single-owner, approval-gated AI portfolio manager"
+requires-python = ">=3.11"
+dependencies = ["SQLAlchemy==2.0.50", "pydantic==2.13.4", "httpx==0.28.1"]
+
+[project.optional-dependencies]
+live = ["psycopg[binary]==3.3.4"]
+dev = ["pytest==9.0.2"]
+
+[project.scripts]
+portfolio-os = "portfolio_os.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"

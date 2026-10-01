@@ -1,0 +1,19 @@
+{
+  "human_wip_limit": 3,
+  "max_reviews_per_tick": 3,
+  "max_tasks_per_tick": 1,
+  "max_paid_requests_per_day": 6,
+  "max_output_tokens_per_request": 2400,
+  "max_input_characters": 18000,
+  "request_timeout_seconds": 90,
+  "lease_seconds": 900,
+  "approval_ttl_days": 7,
+  "max_pending_approvals": 5,
+  "min_review_interval_days": 7,
+  "park_review_interval_days": 30,
+  "max_idle_reviews_before_park": 2,
+  "max_evidence_items_in_context": 12,
+  "allow_web_research": true,
+  "auto_park_ai_only": true,
+  "allow_codex_execution": false
+}
