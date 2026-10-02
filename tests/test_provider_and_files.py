@@ -144,3 +144,24 @@ def test_production_cannot_silently_use_sqlite():
 def test_policy_never_enables_codex_automatically():
     with pytest.raises(ValidationError): Policy(allow_codex_execution=True)
     with pytest.raises(ValidationError): Policy(human_wip_limit=4)
+
+
+@pytest.mark.parametrize("error_obj,expected", [
+    ({"type":"insufficient_quota"}, "OPENAI_QUOTA_EXCEEDED"),
+    ({"code":"credit_balance_exhausted"}, "OPENAI_CREDIT_BALANCE_EXHAUSTED"),
+    ({"code":"organization_usage_limit_exceeded"}, "OPENAI_ORGANIZATION_USAGE_LIMIT_EXCEEDED"),
+    ({"code":"organization_spend_limit_exceeded"}, "OPENAI_ORGANIZATION_SPEND_LIMIT_EXCEEDED"),
+    ({"code":"project_spend_limit_exceeded"}, "OPENAI_PROJECT_SPEND_LIMIT_EXCEEDED"),
+    ({}, "OPENAI_RATE_LIMITED"),
+])
+def test_429_is_safely_classified(root, policy, error_obj, expected):
+    provider=OpenAIProvider(
+        "secret","model",root,
+        transport=httpx.MockTransport(
+            lambda r:httpx.Response(429,json={"error":{**error_obj,"message":"PRIVATE_BILLING_DETAIL"}})
+        )
+    )
+    with pytest.raises(ProviderError) as e:
+        asyncio.run(provider.evaluate({}, policy))
+    assert e.value.code == expected
+    assert "PRIVATE_BILLING_DETAIL" not in str(e.value)

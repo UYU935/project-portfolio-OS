@@ -67,7 +67,28 @@ class OpenAIProvider:
         except (TimeoutError, httpx.TimeoutException, httpx.NetworkError) as exc:
             raise ProviderError("NETWORK_COMPLETION_UNKNOWN", uncertain=True) from exc
         if resp.status_code >= 400:
-            raise ProviderError(f"OPENAI_HTTP_{resp.status_code}", uncertain=resp.status_code >= 500)
+            code = f"OPENAI_HTTP_{resp.status_code}"
+            if resp.status_code == 429:
+                try:
+                    payload = resp.json()
+                    err = payload.get("error", {}) if isinstance(payload, dict) else {}
+                    err_code = err.get("code") if isinstance(err, dict) else None
+                    err_type = err.get("type") if isinstance(err, dict) else None
+                except ValueError:
+                    err_code = err_type = None
+                quota_codes = {
+                    "credit_balance_exhausted": "OPENAI_CREDIT_BALANCE_EXHAUSTED",
+                    "organization_usage_limit_exceeded": "OPENAI_ORGANIZATION_USAGE_LIMIT_EXCEEDED",
+                    "organization_spend_limit_exceeded": "OPENAI_ORGANIZATION_SPEND_LIMIT_EXCEEDED",
+                    "project_spend_limit_exceeded": "OPENAI_PROJECT_SPEND_LIMIT_EXCEEDED",
+                }
+                if err_code in quota_codes:
+                    code = quota_codes[err_code]
+                elif err_type == "insufficient_quota":
+                    code = "OPENAI_QUOTA_EXCEEDED"
+                else:
+                    code = "OPENAI_RATE_LIMITED"
+            raise ProviderError(code, uncertain=resp.status_code >= 500)
         if len(resp.content) > 4_000_000:
             raise ProviderError("RESPONSE_TOO_LARGE")
         try:
