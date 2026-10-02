@@ -1,0 +1,64 @@
+name: One project evidence review approval pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_paid_review:
+        description: 'Make exactly one paid AI review using saved Evidence'
+        required: true
+        default: false
+        type: boolean
+      confirm_create_pending_approval_if_needed:
+        description: 'Allow creation of one PENDING approval when the recommendation requires owner approval'
+        required: true
+        default: false
+        type: boolean
+      confirm_sanitized_project:
+        description: 'I confirmed the selected project contains no patient/child/personal secrets'
+        required: true
+        default: false
+        type: boolean
+      model:
+        description: 'OpenAI model ID'
+        required: true
+        default: 'gpt-6-sol'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-one-project-approval-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_paid_review == true && inputs.confirm_create_pending_approval_if_needed == true && inputs.confirm_sanitized_project == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: portfolio-preflight
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Install live dependencies
+        run: python -m pip install -e '.[live]'
+      - name: Review saved Evidence and create PENDING approval only if warranted
+        env:
+          PORTFOLIO_APPROVAL_REVIEW_REQUESTED: '1'
+          TRIAL_CONFIRM_SANITIZED: '1'
+          TRIAL_CONFIRM_APPROVAL_PROPOSAL: '1'
+          TRIAL_PROJECT_SLUG: ${{ secrets.TRIAL_PROJECT_SLUG }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_CA_CERT: ${{ secrets.DATABASE_CA_CERT }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ inputs.model }}
+        run: python scripts/one_project_approval_review.py
+
+# Manual-only. One evaluation request using already-saved Evidence.
+# May create one PENDING approval for HUMAN_ACTIVE / ADVANCE / PARK / ARCHIVE.
+# Never applies the recommendation, changes project state, schedules work,
+# performs web search, runs Codex, or sends external messages.
