@@ -20,11 +20,21 @@ CHECKS = (
 )
 
 
-def emit(status: str, reason: str, checks: dict | None = None) -> int:
+def emit(status: str, reason: str, checks: dict | None = None,
+         transport: dict | None = None) -> int:
     # Never include credentials, exception messages, raw doctor output or counts.
     result = {"status": status, "reason": reason, "paid_calls_made": 0}
     if checks is not None:
         result["checks"] = {key: checks.get(key) is True for key in CHECKS}
+    if isinstance(transport, dict):
+        backend_tls = transport.get("postgres_backend_tls")
+        result["transport"] = {
+            "client_tls_verified": transport.get("client_tls_verified") is True,
+            "postgres_backend_tls": backend_tls if type(backend_tls) is bool else None,
+            "end_to_end_tls_verified": False,
+        }
+        if backend_tls is not True:
+            result["warnings"] = ["postgres_backend_tls_not_confirmed"]
     print(json.dumps(result, sort_keys=True))
     return 0 if status == "ready" else 2
 
@@ -92,7 +102,7 @@ def main() -> int:
             )
             return emit("ready" if ready else "blocked",
                         "read_only_database_checks_passed" if ready else "database_checks_failed",
-                        safe_checks)
+                        safe_checks, database.get("transport"))
     except subprocess.TimeoutExpired:
         return emit("blocked", "diagnostic_timeout")
     except Exception:
